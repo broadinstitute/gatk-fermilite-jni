@@ -1,0 +1,221 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+}
+
+plugins {
+    id 'java'
+    id 'maven'
+    id 'signing'
+    id 'c'
+    id 'org.ajoberstar.grgit' version '1.6.0' //git operations
+    id 'com.palantir.git-version' version '0.5.1' //version helper
+}
+
+import org.ajoberstar.grgit.Grgit
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testCompile 'org.testng:testng:6.9.6'
+}
+
+final isRelease = Boolean.getBoolean("release")
+version = (isRelease ? gitVersion() : gitVersion() + "-SNAPSHOT").replaceAll(".dirty", "")
+
+final String FERMI_LITE_COMMIT = "562638112"
+def CLIB = new File("$buildDir/clib")
+def FERMI_CLONE_DIR = new File("$CLIB/fermi-lite")
+
+task cloneFermilite {
+    description "clone fermilite"
+    outputs.dir FERMI_CLONE_DIR
+    doLast {
+        FERMI_CLONE_DIR.deleteDir()
+        def grgit = Grgit.clone(dir: "$FERMI_CLONE_DIR",
+                uri: 'https://github.com/lh3/fermi-lite.git')
+        grgit.checkout(branch: FERMI_LITE_COMMIT)
+    }
+}
+
+task writeFermiVersionHeader dependsOn cloneFermilite {
+    def FERMI_VERSION_HEADER = new File("$FERMI_CLONE_DIR/fml_commit.h")
+    description "record the fermi version"
+    outputs.files FERMI_VERSION_HEADER
+    doLast {
+      FERMI_VERSION_HEADER.write "#define FML_COMMIT \"$FERMI_LITE_COMMIT\""
+    }
+
+}
+
+model {
+    platforms {
+        x64 {
+            architecture "x86_64"
+            operatingSystem "linux"
+        }
+        osx {
+            architecture "x86_64"
+            operatingSystem "osx"
+        }
+    }
+    
+    components {
+        FermiliteJNI(NativeLibrarySpec) {
+            sources.c.source {
+                srcDirs "src/main/c/", CLIB
+                include "**/*.c"
+            }
+
+            binaries.withType(SharedLibraryBinarySpec) { binary ->
+                cCompiler.args "-I", "${System.properties['java.home']}/../include"
+                cCompiler.args "-I", "$CLIB"
+                cCompiler.args "-Wall", "-fPIC", "-O2"
+                linker.args "-lz", "-lm", '-lpthread'
+
+                if ( targetPlatform.operatingSystem.macOsX) {
+                    cCompiler.args "-I", "${System.properties['java.home']}/../include/Darwin"
+                    sharedLibraryFile "$buildDir/libs/jni/libfml.Darwin.dylib"
+                } else {
+                    cCompiler.args "-I", "${System.properties['java.home']}/../include/linux"
+                    sharedLibraryFile "$buildDir/libs/jni/libfml.Linux.so"
+                }
+                
+                jar.dependsOn binary
+                test.dependsOn binary
+            }
+
+            // skip static library build
+            binaries.withType(StaticLibraryBinarySpec) { binary ->
+                buildable = false
+            }
+        }
+
+    }
+
+    tasks.compileFermiliteJNISharedLibraryFermiliteJNIC {
+        dependsOn cloneFermilite, writeFermiVersionHeader
+    }
+    
+
+}
+
+processResources {
+    from "$buildDir/libs/jni"
+}
+
+test {
+    useTestNG()
+    testLogging {
+        testLogging {
+            events "skipped", "failed"
+            exceptionFormat = "full"
+        }
+        afterSuite { desc, result ->
+            if (!desc.parent) { // will match the outermost suite
+                println "Results: ${result.resultType} (${result.testCount} tests, ${result.successfulTestCount} successes, ${result.failedTestCount} failures, ${result.skippedTestCount} skipped)"
+            }
+        }
+    }
+}
+
+
+javadoc {
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from 'build/docs/javadoc'
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allSource
+    classifier = 'sources'
+}
+
+/**
+ *This specifies what artifacts will be built and uploaded when performing a maven upload.
+ */
+artifacts {
+    archives jar
+    archives javadocJar
+    archives sourcesJar
+}
+
+/**
+ * Sign non-snapshot releases with our secret key.  This should never need to be invoked directly.
+ */
+signing {
+    required { isRelease && gradle.taskGraph.hasTask("uploadArchives") }
+    sign configurations.archives
+}
+
+def assertLibExists(lib){
+    if ( ! file(lib).exists()){
+        throw new GradleException("Could not perform a maven release because $lib is missing.  You must include both OSX and Linux binaries to release. " +
+                "You can run scripts/build_both_dylib_and_so.sh to build both if you are on a Broad Institute connected mac.")
+    }
+}
+
+/**
+ * Upload a release to sonatype.  You must be an authorized uploader and have your sonatype
+ * username and password information in your gradle properties file.  See the readme for more info.
+ *
+ * For releasing to your local maven repo, use gradle install
+ */
+uploadArchives {
+    doFirst {
+        println "Attempting to upload version:$version"
+        if (isRelease){
+            assertLibExists("$buildDir/libs/jni/libfml.Linux.so")
+            assertLibExists("$buildDir/libs/jni/libfml.Darwin.dylib")
+        }
+    }
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                authentication(userName: project.findProperty("sonatypeUsername"), password: project.findProperty("sonatypePassword"))
+            }
+
+            snapshotRepository(url: "https://artifactory.broadinstitute.org/artifactory/libs-snapshot-local/") {
+                authentication(userName: System.env.ARTIFACTORY_USERNAME, password: System.env.ARTIFACTORY_PASSWORD)
+            }
+
+            pom.project {
+                name 'gatk-fermilite-jni'
+                packaging 'jar'
+                description 'java Bindings for the fermi-lite assembler'
+                url 'http://github.com/broadinstitute/gatk-fermlite-jni'
+
+                scm {
+                    url 'scm:git@github.com:broadinstitute/gatk-fermlite-jni.git'
+                    connection 'scm:git@github.com:broadinstitute/gatk-fermilite-jni.git'
+                    developerConnection 'scm:git@github.com:broadinstitute/gatk-fermilite-jni.git'
+                }
+
+                developers {
+                    developer {
+                        id = "gatkdev"
+                        name = "GATK Development Team"
+                        email = "gatk-dev-public@broadinstitute.org"
+                    }
+                }
+
+                licenses {
+                    license {
+                        name 'BSD 3-Clause'
+                        url 'https://github.com/broadinstitute/gatk-fermilite-jni/blob/master/LICENSE.TXT'
+                        distribution 'repo'
+                    }
+                }
+            }
+        }
+    }
+}
+
