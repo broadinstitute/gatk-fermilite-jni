@@ -14,17 +14,20 @@ else
 LIB_EXT=Linux.so
 endif
 
+FERMI_LITE_COMMIT=562638112b7992f4d7a243ccd9ab2b3bd08c6b08
+JNI_BASE_NAME=org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler
 
 all: libfml.$(LIB_EXT)
 
-libfml.$(LIB_EXT): org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler.o fermi-lite/libfml.a
+libfml.$(LIB_EXT): $(JNI_BASE_NAME).o fermi-lite/libfml.a
 	$(CC) -dynamiclib -shared -o $@ $^ -lm -lz -lpthread
 
-fermi-lite/libfml.a:
-	git clone https://github.com/lh3/fermi-lite
+fermi-lite:
+	git clone https://github.com/lh3/fermi-lite && cd fermi-lite && git checkout $(FERMI_LITE_COMMIT) && echo '#define FML_COMMIT "'$(FERMI_LITE_COMMIT)'"' > fml_commit.h
+
+fermi-lite/libfml.a: fermi-lite
 	$(MAKE) CFLAGS="$(CFLAGS)" -C fermi-lite libfml.a
 
-JNI_BASE_NAME=org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler
 $(JNI_BASE_NAME).o: $(JNI_BASE_NAME).c fermi-lite/libfml.a
 
 test: test.o fermi-lite/libfml.a

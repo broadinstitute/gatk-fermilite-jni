@@ -31,10 +31,10 @@ public final class FermiLiteAssembly {
         public byte[] getSequence() { return sequence; }
         public byte[] getPerBaseCoverage() { return perBaseCoverage; }
         public int getNSupportingReads() { return nSupportingReads; }
-        public List<Connection> getConnections() { return Collections.unmodifiableList(connections); }
+        public List<Connection> getConnections() { return connections; }
 
         void setConnections( final List<Connection> connections ) {
-            this.connections = connections;
+            this.connections = Collections.unmodifiableList(connections);
         }
     }
 
@@ -42,7 +42,7 @@ public final class FermiLiteAssembly {
     public final static class Connection {
         private final Contig target;      // contig that overlaps the one that possesses this connection
         private final int overlapLen;     // bases in common -- negative overlap lengths are legal, and represent gaps
-        private final boolean isRC;       // if target is a predecessor
+        private final boolean isRC;       // if target is a predecessor (i.e., upstream of the 5' end of this one)
         private final boolean isTargetRC; // if connection is to RC of target contig
 
         Connection( final Contig target, final int overlapLen, final boolean isRC, final boolean isTargetRC ) {
@@ -52,24 +52,29 @@ public final class FermiLiteAssembly {
             this.isTargetRC = isTargetRC;
         }
 
+        /** contig that overlaps the one that possesses this connection */
         public Contig getTarget() { return target; }
+        /** bases in common -- negative overlap lengths are legal, and represent gaps */
         public int getOverlapLen() { return overlapLen; }
+        /** if target is a predecessor (i.e., upstream of the 5' end of this one) */
         public boolean isRC() { return isRC; }
+        /** if connection is to RC of target contig */
         public boolean isTargetRC() { return isTargetRC; }
     }
 
+    /** Dump a fermi-lite native format description of the assembly. */
     public void writeGFA( final OutputStream os ) throws IOException {
         final HashMap<Contig, Integer> idMap = new HashMap<>((int)((contigs.size()*4L)/3) + 1);
         int id = 0;
         for (final Contig contig : contigs) {
-            idMap.put(contig, ++id);
+            idMap.put(contig, id++);
         }
         try ( final Writer writer =
                       new OutputStreamWriter(new BufferedOutputStream(os)) ) {
             writer.write("H\tVN:Z:1.0\n");
             for ( final Contig contig : contigs ) {
                 final int contigId = idMap.get(contig);
-                writer.write("S\ttig" + contigId + "\t" + new String(contig.getSequence()) +
+                writer.write("S\t" + contigId + "\t" + new String(contig.getSequence()) +
                         "\tLN:i:" + contig.getSequence().length + "\tRC:i:" + contig.getNSupportingReads() + "\n");
                 for ( final Connection connection : contig.getConnections() ) {
                     final int targetId = idMap.get(connection.getTarget());

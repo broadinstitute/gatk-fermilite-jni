@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "fermi-lite/fml.h"
+#include "fermi-lite/fml_commit.h"
 
 JNIEXPORT jobject JNICALL
 Java_org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler_createAssemblyData( JNIEnv* env, jclass cls, jobject readBuf ) {
@@ -76,4 +77,9 @@ Java_org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler_createAssembly
 JNIEXPORT void JNICALL
 Java_org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler_destroyAssemblyData( JNIEnv* env, jclass cls, jobject asmBuf ) {
 	free((*env)->GetDirectBufferAddress(env, asmBuf));
+}
+
+JNIEXPORT jstring JNICALL
+Java_org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler_getVersion( JNIEnv* env, jclass cls ) {
+        return (*env)->NewStringUTF(env, FML_COMMIT);
 }

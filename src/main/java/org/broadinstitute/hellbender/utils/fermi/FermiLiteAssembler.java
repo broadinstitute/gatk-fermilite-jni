@@ -11,6 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
+/**
+ * Class that allows you to exercise Heng Li's fermi-lite assembler.
+ * This is backed by JNI native code, which could fail to load.
+ */
 public final class FermiLiteAssembler {
     private static volatile boolean nativeLibLoaded = false;
 
@@ -23,10 +27,16 @@ public final class FermiLiteAssembler {
         byte[] getQuals();
     }
 
+    /**
+     * Create an assembly from a collection of objects that implement BasesAndQuals.
+     */
     public FermiLiteAssembly createAssembly( final Iterable<BasesAndQuals> basesAndQuals ) {
         return createAssembly(basesAndQuals, bAndQ -> bAndQ);
     }
 
+    /**
+     * Create an assembly from a collection of objects that can be transformed (with a lambda) into BasesAndQuals.
+     */
     public <T> FermiLiteAssembly createAssembly( final Iterable<T> reads, final Function<T,BasesAndQuals> func ) {
         final ByteBuffer assemblyData = createAssemblyData(makeReadData(reads, func));
         if ( assemblyData == null ) throw new IllegalStateException("Unable to create assembly.");
@@ -35,6 +45,11 @@ public final class FermiLiteAssembler {
         } finally {
             destroyAssemblyData(assemblyData);
         }
+    }
+
+    public static String getFermiLiteVersion() {
+        loadNativeLibrary();
+        return getVersion();
     }
 
     private static void loadNativeLibrary() {
@@ -49,12 +64,19 @@ public final class FermiLiteAssembler {
                         final String osName = System.getProperty("os.name", "unknown").toUpperCase();
                         final String osArch = System.getProperty("os.arch");
                         final String libName;
-                        if ( !"x86_64".equals(osArch) && !"amd64".equals(osArch) ) libName = null;
-                        else if ( osName.startsWith("MAC") ) libName = "/libfml.Darwin.dylib";
+                        if ( !"x86_64".equals(osArch) && !"amd64".equals(osArch) ) {
+                            throw new IllegalStateException(
+                                    "We have pre-built fermi-lite binaries only for x86_64 and amd64.  "+
+                                    "Your os.arch is "+osArch+"."+
+                                    "Set property LIBFML_PATH to point to a native library for your architecture.");
+                        }
+                        if ( osName.startsWith("MAC") ) libName = "/libfml.Darwin.dylib";
                         else if ( osName.startsWith("LINUX") ) libName = "/libfml.Linux.so";
-                        else libName = null;
-                        if ( libName == null ) {
-                            throw new IllegalStateException("We have a JNI binding for fermi-lite only for x86-64 Linux and Mac.");
+                        else {
+                            throw new IllegalStateException(
+                                    "We have pre-built fermi-lite binaries only for Linux and Mac.  "+
+                                    "Your os.name is "+osName+"."+
+                                    "Set property LIBFML_PATH to point to a native library for your operating system.");
                         }
                         try ( final InputStream is = FermiLiteAssembler.class.getResourceAsStream(libName) ) {
                             if ( is == null ) {
@@ -158,4 +180,5 @@ public final class FermiLiteAssembler {
     // these should be called in succession by the same thread
     private static native ByteBuffer createAssemblyData( final ByteBuffer readData );
     private static native void destroyAssemblyData( final ByteBuffer assemblyData );
+    private static native String getVersion();
 }

@@ -3,9 +3,8 @@ package org.broadinstitute.hellbender.utils.fermi;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -58,5 +57,10 @@ public class FermiLiteAssemblerTest {
         final FermiLiteAssembly assembly = new FermiLiteAssembler().createAssembly(seqsList, TestRead::new);
         Assert.assertEquals(assembly.getNContigs(), 1);
         Assert.assertEquals(assembly.getContig(0).getSequence(), expectedContig.getBytes());
+        final byte[] expected = Files.readAllBytes(new File("src/test/resources/test.gfa").toPath());
+        try ( final ByteArrayOutputStream os = new ByteArrayOutputStream() ) {
+            assembly.writeGFA(os);
+            Assert.assertEquals(os.toByteArray(), expected);
+        }
     }
 }
