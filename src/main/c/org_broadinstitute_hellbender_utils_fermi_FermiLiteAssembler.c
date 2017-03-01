@@ -5,7 +5,14 @@
 #include "fermi-lite/fml_commit.h"
 
 JNIEXPORT jobject JNICALL
-Java_org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler_createAssemblyData( JNIEnv* env, jclass cls, jobject readBuf ) {
+Java_org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler_createDefaultOptions( JNIEnv* env, jclass cls ) {
+    fml_opt_t* pOpts = malloc(sizeof(fml_opt_t));
+    fml_opt_init(pOpts);
+	return (*env)->NewDirectByteBuffer(env,pOpts,sizeof(fml_opt_t));
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler_createAssemblyData( JNIEnv* env, jclass cls, jobject optsBuf, jobject readBuf ) {
 
 	// build input data structure (reads)
 	int32_t* pReadsBuf = (*env)->GetDirectBufferAddress(env, readBuf);
@@ -25,9 +32,8 @@ Java_org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler_createAssembly
 
 	// assemble the reads
 	int32_t nUnitigs;
-	fml_opt_t opts;
-	fml_opt_init(&opts);
-	fml_utg_t* pUnitigs = fml_assemble(&opts, nSeqs, pReads, &nUnitigs);
+	fml_opt_t* pOpts = (*env)->GetDirectBufferAddress(env, optsBuf);
+	fml_utg_t* pUnitigs = fml_assemble(pOpts, nSeqs, pReads, &nUnitigs);
 	fml_utg_t* pUnitigsEnd = pUnitigs + nUnitigs;
 
 	// marshal the output data (unitigs and connections)
@@ -75,8 +81,8 @@ Java_org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler_createAssembly
 }
 
 JNIEXPORT void JNICALL
-Java_org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler_destroyAssemblyData( JNIEnv* env, jclass cls, jobject asmBuf ) {
-	free((*env)->GetDirectBufferAddress(env, asmBuf));
+Java_org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler_destroyByteBuffer( JNIEnv* env, jclass cls, jobject byteBuffer ) {
+	free((*env)->GetDirectBufferAddress(env, byteBuffer));
 }
 
 JNIEXPORT jstring JNICALL
