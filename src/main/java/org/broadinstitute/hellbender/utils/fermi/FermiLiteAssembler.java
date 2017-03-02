@@ -29,7 +29,12 @@ public final class FermiLiteAssembler implements AutoCloseable {
     public boolean isOpen() { return opts != null; }
 
     @Override
-    public void close() { destroyByteBuffer(getOpts()); opts = null; }
+    public void close() {
+        if ( opts != null ) {
+            destroyByteBuffer(opts);
+            opts = null;
+        }
+    }
 
     public interface BasesAndQuals {
         byte[] getBases();
@@ -84,8 +89,8 @@ public final class FermiLiteAssembler implements AutoCloseable {
     public void setCleaningMaxBCov( final float maxBCov ) { getOpts().putFloat(72,maxBCov); }
     public float getCleaningMaxBFrac() { return getOpts().getFloat(76); }
     public void setCleaningMaxBFrac( final float maxBFrac ) { getOpts().putFloat(76,maxBFrac); }
-    public int getExpectedOptsSize() { return 80; }
-    public int getOptsSize() { return getOpts().capacity(); }
+    int getExpectedOptsSize() { return 80; }
+    int getOptsSize() { return getOpts().capacity(); }
 
     /**
      * Create an assembly from a collection of objects that implement BasesAndQuals.
