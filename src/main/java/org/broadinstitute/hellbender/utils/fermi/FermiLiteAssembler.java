@@ -14,12 +14,26 @@ import java.util.function.Function;
 /**
  * Class that allows you to exercise Heng Li's fermi-lite assembler.
  * This is backed by JNI native code, which could fail to load.
+ * This class is not thread-safe, but it's very light-weight:  just use a separate instance in each thread.
  */
-public final class FermiLiteAssembler {
+public final class FermiLiteAssembler implements AutoCloseable {
     private static volatile boolean nativeLibLoaded = false;
+    private ByteBuffer opts;
 
     public FermiLiteAssembler() {
         loadNativeLibrary();
+        opts = createDefaultOptions();
+        opts.order(ByteOrder.nativeOrder()).position(0).limit(opts.capacity());
+    }
+
+    public boolean isOpen() { return opts != null; }
+
+    @Override
+    public void close() {
+        if ( opts != null ) {
+            destroyByteBuffer(opts);
+            opts = null;
+        }
     }
 
     public interface BasesAndQuals {
@@ -27,10 +41,61 @@ public final class FermiLiteAssembler {
         byte[] getQuals();
     }
 
+    /** number of threads; don't use multi-threading for small data sets */
+    public int getNThreads() { return getOpts().getInt(0); }
+    public void setNThreads( final int nThreads ) { getOpts().putInt(0,nThreads); }
+    /** k-mer length for error correction; 0 for auto estimate */
+    public int getECKSize() { return getOpts().getInt(4); }
+    public void setECKSize( final int kSize ) { getOpts().putInt(4,kSize); }
+
+    /** both occ threshold in ec and tip threshold in cleaning lie in [min_cnt,max_cnt] */
+    public int getMinCnt() { return getOpts().getInt(8); }
+    public void setMinCnt( final int minCnt ) { getOpts().putInt(8,minCnt); }
+    public int getMaxCnt() { return getOpts().getInt(12); }
+    public void setMaxCnt( final int maxCnt ) { getOpts().putInt(12,maxCnt); }
+    /** min overlap length during assembly */
+    public int getMinAsmOverlap() { return getOpts().getInt(16); }
+    public void setMinAsmOverlap( final int minAsmOverlap ) { getOpts().putInt(16,minAsmOverlap); }
+    /** during assembly, don't explicitly merge an overlap if shorter than this value */
+    public int getMinMergeLen() { return getOpts().getInt(20); }
+    public void setMinMergeLen( final int minMergeLen ) { getOpts().putInt(20,minMergeLen); }
+
+    /** graph cleaning options -- you'll have to look at the fermi lite code to try to figure out what these do */
+    public int getCleaningFlag() { return getOpts().getInt(24); }
+    public void setCleaningFlag( final int cleaningFlag ) { getOpts().putInt(24,cleaningFlag); }
+    public int getCleaningMinOverlap() { return getOpts().getInt(28); }
+    public void setCleaningMinOverlap( final int minOverlap ) { getOpts().putInt(28,minOverlap); }
+    public int getCleaningELen() { return getOpts().getInt(32); }
+    public void setCleaningELen( final int eLen ) { getOpts().putInt(32,eLen); }
+    public int getCleaningMinEnsr() { return getOpts().getInt(36); }
+    public void setCleaningMinEnsr( final int minEnsr ) { getOpts().putInt(36,minEnsr); }
+    public int getCleaningMinInsr() { return getOpts().getInt(40); }
+    public void setCleaningMinInsr( final int minInsr ) { getOpts().putInt(40,minInsr); }
+    public int getCleaningMaxBDist() { return getOpts().getInt(44); }
+    public void setCleaningMaxBDist( final int maxBDist ) { getOpts().putInt(44,maxBDist); }
+    public int getCleaningMaxBDiff() { return getOpts().getInt(48); }
+    public void setCleaningMaxBDiff( final int maxBDiff ) { getOpts().putInt(48,maxBDiff); }
+    public int getCleaningMaxBVtx() { return getOpts().getInt(52); }
+    public void setCleaningMaxBVtx( final int maxBVtx ) { getOpts().putInt(52,maxBVtx); }
+    public int getCleaningMinMergeLen() { return getOpts().getInt(56); }
+    public void setCleaningMinMergeLen( final int minMergeLen ) { getOpts().putInt(56,minMergeLen); }
+    public int getCleaningTrimLen() { return getOpts().getInt(60); }
+    public void setCleaningTrimLen( final int trimLen ) { getOpts().putInt(60,trimLen); }
+    public int getCleaningTrimDepth() { return getOpts().getInt(64); }
+    public void setCleaningTrimDepth( final int trimDepth ) { getOpts().putInt(64,trimDepth); }
+    public float getCleaningDRatio1() { return getOpts().getFloat(68); }
+    public void setCleaningDRatio1( final float dRatio1 ) { getOpts().putFloat(68,dRatio1); }
+    public float getCleaningMaxBCov() { return getOpts().getFloat(72); }
+    public void setCleaningMaxBCov( final float maxBCov ) { getOpts().putFloat(72,maxBCov); }
+    public float getCleaningMaxBFrac() { return getOpts().getFloat(76); }
+    public void setCleaningMaxBFrac( final float maxBFrac ) { getOpts().putFloat(76,maxBFrac); }
+    int getExpectedOptsSize() { return 80; }
+    int getOptsSize() { return getOpts().capacity(); }
+
     /**
      * Create an assembly from a collection of objects that implement BasesAndQuals.
      */
-    public FermiLiteAssembly createAssembly( final Iterable<BasesAndQuals> basesAndQuals ) {
+    public FermiLiteAssembly createAssembly( final Iterable<? extends BasesAndQuals> basesAndQuals ) {
         return createAssembly(basesAndQuals, bAndQ -> bAndQ);
     }
 
@@ -38,12 +103,13 @@ public final class FermiLiteAssembler {
      * Create an assembly from a collection of objects that can be transformed (with a lambda) into BasesAndQuals.
      */
     public <T> FermiLiteAssembly createAssembly( final Iterable<T> reads, final Function<T,BasesAndQuals> func ) {
-        final ByteBuffer assemblyData = createAssemblyData(makeReadData(reads, func));
+        final ByteBuffer tmpOpts = getOpts();
+        final ByteBuffer assemblyData = createAssemblyData(tmpOpts,makeReadData(reads, func));
         if ( assemblyData == null ) throw new IllegalStateException("Unable to create assembly.");
         try {
             return interpretAssemblyData(assemblyData);
         } finally {
-            destroyAssemblyData(assemblyData);
+            destroyByteBuffer(assemblyData);
         }
     }
 
@@ -177,8 +243,15 @@ public final class FermiLiteAssembler {
         return new FermiLiteAssembly(contigs);
     }
 
-    // these should be called in succession by the same thread
-    private static native ByteBuffer createAssemblyData( final ByteBuffer readData );
-    private static native void destroyAssemblyData( final ByteBuffer assemblyData );
+    private ByteBuffer getOpts() {
+        if ( opts == null ) {
+            throw new IllegalStateException("The assembler has been closed.");
+        }
+        return opts;
+    }
+
+    private static native ByteBuffer createDefaultOptions();
+    private static native ByteBuffer createAssemblyData( final ByteBuffer opts, final ByteBuffer readData );
+    private static native void destroyByteBuffer( final ByteBuffer byteBuffer );
     private static native String getVersion();
 }

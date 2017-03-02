@@ -23,6 +23,13 @@ public class FermiLiteAssemblerTest {
     }
 
     @Test
+    public void testOptsSize() {
+        try ( final FermiLiteAssembler assembler = new FermiLiteAssembler() ) {
+            Assert.assertEquals(assembler.getOptsSize(), assembler.getExpectedOptsSize());
+        }
+    }
+
+    @Test
     public void testFermiLiteAssembly() throws IOException {
         final String expectedContig =
                 "AATTTGCAAAAGGCCTAATAATCGGCAGAGTTGGTGCCTCTGGAGGTGAGTGTGAGGGGGATCTAATAAAAGAAGGTTTA"+
