@@ -14,10 +14,11 @@ import java.util.function.Function;
 /**
  * Class that allows you to exercise Heng Li's fermi-lite assembler.
  * This is backed by JNI native code, which could fail to load.
+ * This class is not thread-safe, but it's very light-weight:  just use a separate instance in each thread.
  */
 public final class FermiLiteAssembler implements AutoCloseable {
     private static volatile boolean nativeLibLoaded = false;
-    private final ByteBuffer opts;
+    private ByteBuffer opts;
 
     public FermiLiteAssembler() {
         loadNativeLibrary();
@@ -25,61 +26,66 @@ public final class FermiLiteAssembler implements AutoCloseable {
         opts.order(ByteOrder.nativeOrder()).position(0).limit(opts.capacity());
     }
 
+    public boolean isOpen() { return opts != null; }
+
     @Override
-    public void close() { destroyByteBuffer(opts); }
+    public void close() { checkOpen(); destroyByteBuffer(opts); opts = null; }
 
     public interface BasesAndQuals {
         byte[] getBases();
         byte[] getQuals();
     }
 
-    // number of threads; don't use multi-threading for small data sets
-    public int getNThreads() { return opts.getInt(0); }
-    public void setNThreads( final int nThreads ) { opts.putInt(0,nThreads); }
-    // k-mer length for error correction; 0 for auto estimate
-    public int getECKSize() { return opts.getInt(4); }
-    public void setECKSize( final int kSize ) { opts.putInt(4,kSize); }
-    // both occ threshold in ec and tip threshold in cleaning lie in [min_cnt,max_cnt]
-    public int getMinCnt() { return opts.getInt(8); }
-    public void setMinCnt( final int minCnt ) { opts.putInt(8,minCnt); }
-    public int getMaxCnt() { return opts.getInt(12); }
-    public void setMaxCnt( final int maxCnt ) { opts.putInt(12,maxCnt); }
-    // min overlap length during assembly
-    public int getMinAsmOverlap() { return opts.getInt(16); }
-    public void setMinAsmOverlap( final int minAsmOverlap ) { opts.putInt(16,minAsmOverlap); }
-    // during assembly, don't explicitly merge an overlap if shorter than this value
-    public int getMinMergeLen() { return opts.getInt(20); }
-    public void setMinMergeLen( final int minMergeLen ) { opts.putInt(20,minMergeLen); }
+    /** number of threads; don't use multi-threading for small data sets */
+    public int getNThreads() { checkOpen(); return opts.getInt(0); }
+    public void setNThreads( final int nThreads ) { checkOpen(); opts.putInt(0,nThreads); }
+    /** k-mer length for error correction; 0 for auto estimate */
+    public int getECKSize() { checkOpen(); return opts.getInt(4); }
+    public void setECKSize( final int kSize ) { checkOpen(); opts.putInt(4,kSize); }
 
-    // graph cleaning options -- you'll have to look at the fermi lite code to try to figure out what these do
-    public int getCleaningFlag() { return opts.getInt(24); }
-    public void setCleaningFlag( final int cleaningFlag ) { opts.putInt(24,cleaningFlag); }
-    public int getCleaningMinOverlap() { return opts.getInt(28); }
-    public void setCleaningMinOverlap( final int minOverlap ) { opts.putInt(28,minOverlap); }
-    public int getCleaningELen() { return opts.getInt(32); }
-    public void setCleaningELen( final int eLen ) { opts.putInt(32,eLen); }
-    public int getCleaningMinEnsr() { return opts.getInt(36); }
-    public void setCleaningMinEnsr( final int minEnsr ) { opts.putInt(36,minEnsr); }
-    public int getCleaningMinInsr() { return opts.getInt(40); }
-    public void setCleaningMinInsr( final int minInsr ) { opts.putInt(40,minInsr); }
-    public int getCleaningMaxBDist() { return opts.getInt(44); }
-    public void setCleaningMaxBDist( final int maxBDist ) { opts.putInt(44,maxBDist); }
-    public int getCleaningMaxBDiff() { return opts.getInt(48); }
-    public void setCleaningMaxBDiff( final int maxBDiff ) { opts.putInt(48,maxBDiff); }
-    public int getCleaningMaxBVtx() { return opts.getInt(52); }
-    public void setCleaningMaxBVtx( final int maxBVtx ) { opts.putInt(52,maxBVtx); }
-    public int getCleaningMinMergeLen() { return opts.getInt(56); }
-    public void setCleaningMinMergeLen( final int minMergeLen ) { opts.putInt(56,minMergeLen); }
-    public int getCleaningTrimLen() { return opts.getInt(60); }
-    public void setCleaningTrimLen( final int trimLen ) { opts.putInt(60,trimLen); }
-    public int getCleaningTrimDepth() { return opts.getInt(64); }
-    public void setCleaningTrimDepth( final int trimDepth ) { opts.putInt(64,trimDepth); }
-    public float getCleaningDRatio1() { return opts.getFloat(68); }
-    public void setCleaningDRatio1( final float dRatio1 ) { opts.putFloat(68,dRatio1); }
-    public float getCleaningMaxBCov() { return opts.getFloat(72); }
-    public void setCleaningMaxBCov( final float maxBCov ) { opts.putFloat(72,maxBCov); }
-    public float getCleaningMaxBFrac() { return opts.getFloat(76); }
-    public void setCleaningMaxBFrac( final float maxBFrac ) { opts.putFloat(76,maxBFrac); }
+    /** both occ threshold in ec and tip threshold in cleaning lie in [min_cnt,max_cnt] */
+    public int getMinCnt() { checkOpen(); return opts.getInt(8); }
+    public void setMinCnt( final int minCnt ) { checkOpen(); opts.putInt(8,minCnt); }
+    public int getMaxCnt() { checkOpen(); return opts.getInt(12); }
+    public void setMaxCnt( final int maxCnt ) { checkOpen(); opts.putInt(12,maxCnt); }
+    /** min overlap length during assembly */
+    public int getMinAsmOverlap() { checkOpen(); return opts.getInt(16); }
+    public void setMinAsmOverlap( final int minAsmOverlap ) { checkOpen(); opts.putInt(16,minAsmOverlap); }
+    /** during assembly, don't explicitly merge an overlap if shorter than this value */
+    public int getMinMergeLen() { checkOpen(); return opts.getInt(20); }
+    public void setMinMergeLen( final int minMergeLen ) { checkOpen(); opts.putInt(20,minMergeLen); }
+
+    /** graph cleaning options -- you'll have to look at the fermi lite code to try to figure out what these do */
+    public int getCleaningFlag() { checkOpen(); return opts.getInt(24); }
+    public void setCleaningFlag( final int cleaningFlag ) { checkOpen(); opts.putInt(24,cleaningFlag); }
+    public int getCleaningMinOverlap() { checkOpen(); return opts.getInt(28); }
+    public void setCleaningMinOverlap( final int minOverlap ) { checkOpen(); opts.putInt(28,minOverlap); }
+    public int getCleaningELen() { checkOpen(); return opts.getInt(32); }
+    public void setCleaningELen( final int eLen ) { checkOpen(); opts.putInt(32,eLen); }
+    public int getCleaningMinEnsr() { checkOpen(); return opts.getInt(36); }
+    public void setCleaningMinEnsr( final int minEnsr ) { checkOpen(); opts.putInt(36,minEnsr); }
+    public int getCleaningMinInsr() { checkOpen(); return opts.getInt(40); }
+    public void setCleaningMinInsr( final int minInsr ) { checkOpen(); opts.putInt(40,minInsr); }
+    public int getCleaningMaxBDist() { checkOpen(); return opts.getInt(44); }
+    public void setCleaningMaxBDist( final int maxBDist ) { checkOpen(); opts.putInt(44,maxBDist); }
+    public int getCleaningMaxBDiff() { checkOpen(); return opts.getInt(48); }
+    public void setCleaningMaxBDiff( final int maxBDiff ) { checkOpen(); opts.putInt(48,maxBDiff); }
+    public int getCleaningMaxBVtx() { checkOpen(); return opts.getInt(52); }
+    public void setCleaningMaxBVtx( final int maxBVtx ) { checkOpen(); opts.putInt(52,maxBVtx); }
+    public int getCleaningMinMergeLen() { checkOpen(); return opts.getInt(56); }
+    public void setCleaningMinMergeLen( final int minMergeLen ) { checkOpen(); opts.putInt(56,minMergeLen); }
+    public int getCleaningTrimLen() { checkOpen(); return opts.getInt(60); }
+    public void setCleaningTrimLen( final int trimLen ) { checkOpen(); opts.putInt(60,trimLen); }
+    public int getCleaningTrimDepth() { checkOpen(); return opts.getInt(64); }
+    public void setCleaningTrimDepth( final int trimDepth ) { checkOpen(); opts.putInt(64,trimDepth); }
+    public float getCleaningDRatio1() { checkOpen(); return opts.getFloat(68); }
+    public void setCleaningDRatio1( final float dRatio1 ) { checkOpen(); opts.putFloat(68,dRatio1); }
+    public float getCleaningMaxBCov() { checkOpen(); return opts.getFloat(72); }
+    public void setCleaningMaxBCov( final float maxBCov ) { checkOpen(); opts.putFloat(72,maxBCov); }
+    public float getCleaningMaxBFrac() { checkOpen(); return opts.getFloat(76); }
+    public void setCleaningMaxBFrac( final float maxBFrac ) { checkOpen(); opts.putFloat(76,maxBFrac); }
+    public int getExpectedOptsSize() { return 80; }
+    public int getOptsSize() { return opts.capacity(); }
 
     /**
      * Create an assembly from a collection of objects that implement BasesAndQuals.
@@ -92,6 +98,7 @@ public final class FermiLiteAssembler implements AutoCloseable {
      * Create an assembly from a collection of objects that can be transformed (with a lambda) into BasesAndQuals.
      */
     public <T> FermiLiteAssembly createAssembly( final Iterable<T> reads, final Function<T,BasesAndQuals> func ) {
+        checkOpen();
         final ByteBuffer assemblyData = createAssemblyData(opts,makeReadData(reads, func));
         if ( assemblyData == null ) throw new IllegalStateException("Unable to create assembly.");
         try {
@@ -231,7 +238,12 @@ public final class FermiLiteAssembler implements AutoCloseable {
         return new FermiLiteAssembly(contigs);
     }
 
-    // these should be called in succession by the same thread
+    private void checkOpen() {
+        if ( opts == null ) {
+            throw new IllegalStateException("The assembler has been closed.");
+        }
+    }
+
     private static native ByteBuffer createDefaultOptions();
     private static native ByteBuffer createAssemblyData( final ByteBuffer opts, final ByteBuffer readData );
     private static native void destroyByteBuffer( final ByteBuffer byteBuffer );
