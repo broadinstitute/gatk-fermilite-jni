@@ -9,11 +9,13 @@ import java.util.List;
 public final class FermiLiteAssembly {
     private final List<Contig> contigs;
 
-    FermiLiteAssembly(final List<Contig> contigs ) { this.contigs = contigs; }
+    public FermiLiteAssembly( final List<Contig> contigs ) {
+        this.contigs = Collections.unmodifiableList(contigs);
+    }
 
     public int getNContigs() { return contigs.size(); }
     public Contig getContig( final int idx ) { return contigs.get(idx); }
-    public List<Contig> getContigs() { return Collections.unmodifiableList(contigs); }
+    public List<Contig> getContigs() { return contigs; }
 
     /** a sequence of bases, coverage data, and connections to other contigs */
     public final static class Contig {
@@ -22,7 +24,7 @@ public final class FermiLiteAssembly {
         private final int nSupportingReads;
         private List<Connection> connections;
 
-        Contig( final byte[] sequence, final byte[] perBaseCoverage, final int nSupportingReads ) {
+        public Contig( final byte[] sequence, final byte[] perBaseCoverage, final int nSupportingReads ) {
             this.sequence = sequence;
             this.perBaseCoverage = perBaseCoverage;
             this.nSupportingReads = nSupportingReads;
@@ -33,7 +35,7 @@ public final class FermiLiteAssembly {
         public int getNSupportingReads() { return nSupportingReads; }
         public List<Connection> getConnections() { return connections; }
 
-        void setConnections( final List<Connection> connections ) {
+        public void setConnections( final List<Connection> connections ) {
             this.connections = Collections.unmodifiableList(connections);
         }
     }
@@ -45,7 +47,7 @@ public final class FermiLiteAssembly {
         private final boolean isRC;       // if target is a predecessor (i.e., upstream of the 5' end of this one)
         private final boolean isTargetRC; // if connection is to RC of target contig
 
-        Connection( final Contig target, final int overlapLen, final boolean isRC, final boolean isTargetRC ) {
+        public Connection( final Contig target, final int overlapLen, final boolean isRC, final boolean isTargetRC ) {
             this.target = target;
             this.overlapLen = overlapLen;
             this.isRC = isRC;
