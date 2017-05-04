@@ -28,6 +28,7 @@ public final class FermiLiteAssembly {
             this.sequence = sequence;
             this.perBaseCoverage = perBaseCoverage;
             this.nSupportingReads = nSupportingReads;
+            this.connections = Collections.emptyList();
         }
 
         public byte[] getSequence() { return sequence; }
