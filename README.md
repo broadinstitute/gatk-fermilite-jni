@@ -24,8 +24,14 @@ scripts/build_both_dylib_and_so.sh
 To upload to maven central
 ```
 commit your changes and push your branch to github
-git tag -a -s <version>
-scripts/build_both_dylib_and_so.sh
+# might have to do these to be able to sign the tagged version
+# git config --global commit.gpgsign true
+# gpg --list-keys # to get your key ID
+# git config --global user.signingkey <your key ID>
+# gpg-agent --daemon --sh
+git tag -a -s 1.0.0-rc5 -m 'tag comment' # or some similarly formatted version
+scripts/build_both_dylib_and_so.sh # build on Linux and move lib to src/main/resources
+# source artifactory credentials
 ./gradlew uploadArchive -Drelease=true
 ```
 
