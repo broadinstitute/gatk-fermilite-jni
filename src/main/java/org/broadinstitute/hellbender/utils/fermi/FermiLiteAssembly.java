@@ -18,7 +18,7 @@ public final class FermiLiteAssembly {
     public List<Contig> getContigs() { return contigs; }
 
     /** a sequence of bases, coverage data, and connections to other contigs */
-    public final static class Contig {
+    public static final class Contig {
         private final byte[] sequence;
         private final byte[] perBaseCoverage;
         private final int nSupportingReads;
@@ -42,7 +42,7 @@ public final class FermiLiteAssembly {
     }
 
     /** a connection between contigs */
-    public final static class Connection {
+    public static final class Connection {
         private final Contig target;      // contig that overlaps the one that possesses this connection
         private final int overlapLen;     // bases in common -- negative overlap lengths are legal, and represent gaps
         private final boolean isRC;       // if target is a predecessor (i.e., upstream of the 5' end of this one)
