@@ -27,7 +27,10 @@ String cpath = "src/main/c"
 String libname = "libfml"
 
 task buildFermiLib(type: Exec){
+    group = "Build"
+    description = "build native library"
     workingDir "$cpath"
+    inputs.files "$cpath/Makefile", "$cpath/org_broadinstitute_hellbender_utils_fermi_FermiLiteAssembler.c"
     outputs.files "$cpath/${libname}*"
     outputs.dir "$cpath/fermi-lite"
     commandLine "make"
