@@ -23,6 +23,9 @@ public final class FermiLiteAssembler implements AutoCloseable {
     public FermiLiteAssembler() {
         loadNativeLibrary();
         opts = createDefaultOptions();
+        if ( opts == null ) {
+            throw new IllegalStateException("Unable to create default options.  Out of memory?");
+        }
         opts.order(ByteOrder.nativeOrder()).position(0).limit(opts.capacity());
     }
 
@@ -105,7 +108,7 @@ public final class FermiLiteAssembler implements AutoCloseable {
     public <T> FermiLiteAssembly createAssembly( final Iterable<T> reads, final Function<T,BasesAndQuals> func ) {
         final ByteBuffer tmpOpts = getOpts();
         final ByteBuffer assemblyData = createAssemblyData(tmpOpts,makeReadData(reads, func));
-        if ( assemblyData == null ) throw new IllegalStateException("Unable to create assembly.");
+        if ( assemblyData == null ) throw new IllegalStateException("Unable to create assembly. Out of memory?");
         try {
             return interpretAssemblyData(assemblyData);
         } finally {
@@ -230,12 +233,12 @@ public final class FermiLiteAssembler implements AutoCloseable {
             final List<FermiLiteAssembly.Connection> connections = new ArrayList<>(nConnections);
             while ( nConnections-- > 0 ) {
                 int overlapLen = assemblyData.getInt();
-                final boolean isRC = overlapLen < 0;
-                overlapLen = overlapLen & Integer.MAX_VALUE; // turn off highest bit (which is now in isRC)
+                final boolean isSrc3Prime = overlapLen < 0;
+                overlapLen = overlapLen & Integer.MAX_VALUE; // turn off highest bit (which is now in isSrc3Prime)
                 int contigId = assemblyData.getInt();
-                final boolean isTargetRC = contigId < 0;
-                contigId = contigId & Integer.MAX_VALUE; // turn off highest bit (which is now in isTargetRC)
-                connections.add(new FermiLiteAssembly.Connection(contigs.get(contigId), overlapLen, isRC, isTargetRC));
+                final boolean isTarget3Prime = contigId < 0;
+                contigId = contigId & Integer.MAX_VALUE; // turn off highest bit (which is now in isTarget3Prime)
+                connections.add(new FermiLiteAssembly.Connection(contigs.get(contigId), overlapLen, !isSrc3Prime, isTarget3Prime));
             }
             contig.setConnections(connections);
         }
