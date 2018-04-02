@@ -1,3 +1,6 @@
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.broadinstitute/gatk-fermilite-jni/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.broadinstitute/gatk-fermilite-jni)
+[![Build Status](https://travis-ci.org/broadinstitute/gatk-fermilite-jni.svg?branch=master)](https://travis-ci.org/broadinstitute/gatk-fermilite-jni)
+
 # gatk-fermilite-jni
 JNI code for fermi lite.
 
