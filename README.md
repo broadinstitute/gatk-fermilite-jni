@@ -28,11 +28,13 @@ commit your changes and push your branch to github
 # git config --global commit.gpgsign true
 # gpg --list-keys # to get your key ID
 # git config --global user.signingkey <your key ID>
-# gpg-agent --daemon --sh
-git tag -a -s 1.0.0-rc5 -m 'tag comment' # or some similarly formatted version
-scripts/build_both_dylib_and_so.sh # build on Linux and move lib to src/main/resources
+# export GPG_TTY=$(tty)
+# git config --global gpg.program gpg2
+git tag -a -s 1.0.0-rc6 -m 'tag comment' # or some similarly formatted version
+scripts/build_both_dylib_and_so.sh # build on Linux and move lib to src/main/c
 # source artifactory credentials
 ./gradlew uploadArchive -Drelease=true
+# go to https://oss.sonatype.org/#stagingRepositories and close and release your artifact
 ```
 
 To use this JNI binding on another architecture for which we don't provide a binary:

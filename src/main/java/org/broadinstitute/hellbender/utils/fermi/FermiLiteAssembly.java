@@ -39,6 +39,25 @@ public final class FermiLiteAssembly {
         public void setConnections( final List<Connection> connections ) {
             this.connections = Collections.unmodifiableList(connections);
         }
+
+        public Connection getSolePredecessor() {
+            return getSingletonConnection(true);
+        }
+
+        public Connection getSoleSuccessor() {
+            return getSingletonConnection(false);
+        }
+
+        public Connection getSingletonConnection( final boolean isRC ) {
+            Connection singleton = null;
+            for ( Connection conn : connections ) {
+                if ( conn.isRC() == isRC ) {
+                    if ( singleton != null ) return null; // found multiple connections, return null
+                    singleton = conn;
+                }
+            }
+            return singleton;
+        }
     }
 
     /** a connection between contigs */
@@ -63,30 +82,32 @@ public final class FermiLiteAssembly {
         public boolean isRC() { return isRC; }
         /** if connection is to RC of target contig */
         public boolean isTargetRC() { return isTargetRC; }
+
+        /** call with the contig among whose connections this one appears */
+        public Connection rcConnection( final Contig contig ) {
+            return new Connection(contig, overlapLen, !isTargetRC, !isRC);
+        }
     }
 
     /** Dump a fermi-lite native format description of the assembly. */
-    public void writeGFA( final OutputStream os ) throws IOException {
+    public void writeGFA( final Writer writer ) throws IOException {
         final HashMap<Contig, Integer> idMap = new HashMap<>((int)((contigs.size()*4L)/3) + 1);
         int id = 0;
         for (final Contig contig : contigs) {
             idMap.put(contig, id++);
         }
-        try ( final Writer writer =
-                      new OutputStreamWriter(new BufferedOutputStream(os)) ) {
-            writer.write("H\tVN:Z:1.0\n");
-            for ( final Contig contig : contigs ) {
-                final int contigId = idMap.get(contig);
-                writer.write("S\t" + contigId + "\t" + new String(contig.getSequence()) +
-                        "\tLN:i:" + contig.getSequence().length + "\tRC:i:" + contig.getNSupportingReads() + "\n");
-                for ( final Connection connection : contig.getConnections() ) {
-                    final int targetId = idMap.get(connection.getTarget());
-                    if ( contigId <= targetId ) {
-                        final int overlapLen = connection.getOverlapLen();
-                        writer.write("L\ttig" + contigId + "\t" + (connection.isRC() ? "-" : "+") +
-                                "\ttig" + targetId + "\t" + (connection.isTargetRC() ? "-" : "+") + "\t" +
-                                (overlapLen < 0 ? -overlapLen + "H" : overlapLen + "M") + "\n");
-                    }
+        writer.write("H\tVN:Z:1.0\n");
+        for ( final Contig contig : contigs ) {
+            final int contigId = idMap.get(contig);
+            writer.write("S\ttig" + contigId + "\t" + new String(contig.getSequence()) +
+                    "\tLN:i:" + contig.getSequence().length + "\tRC:i:" + contig.getNSupportingReads() + "\n");
+            for ( final Connection connection : contig.getConnections() ) {
+                final int targetId = idMap.get(connection.getTarget());
+                if ( contigId <= targetId ) {
+                    final int overlapLen = connection.getOverlapLen();
+                    writer.write("L\ttig" + contigId + "\t" + (connection.isRC() ? "-" : "+") +
+                            "\ttig" + targetId + "\t" + (connection.isTargetRC() ? "-" : "+") + "\t" +
+                            (overlapLen < 0 ? -overlapLen + "H" : overlapLen + "M") + "\n");
                 }
             }
         }
