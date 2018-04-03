@@ -33,7 +33,8 @@ commit your changes and push your branch to github
 # git config --global user.signingkey <your key ID>
 # export GPG_TTY=$(tty)
 # git config --global gpg.program gpg2
-git tag -a -s 1.0.0-rc6 -m 'tag comment' # or some similarly formatted version
+git tag -a -s 1.x.x -m 'tag comment'
+git push origin 1.x.x
 scripts/build_both_dylib_and_so.sh # build on Linux and move lib to src/main/c
 # source artifactory credentials
 ./gradlew uploadArchive -Drelease=true
