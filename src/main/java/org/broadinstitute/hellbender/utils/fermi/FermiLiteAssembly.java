@@ -1,6 +1,7 @@
 package org.broadinstitute.hellbender.utils.fermi;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -16,6 +17,36 @@ public final class FermiLiteAssembly {
     public int getNContigs() { return contigs.size(); }
     public Contig getContig( final int idx ) { return contigs.get(idx); }
     public List<Contig> getContigs() { return contigs; }
+
+    /** Computes the largest contig length such that at least half of the total assembly length is contained in
+     *  contigs of that length or longer. */
+    public int computeN50() {
+        final int nContigs = contigs.size();
+        if ( nContigs < 1 ) return 0;
+        if ( nContigs == 1 ) return contigs.get(0).getSequence().length;
+
+        // make an array of all the contig lengths
+        final int[] lengths = new int[nContigs];
+        int totalLength = 0;
+        for ( int idx = 0; idx != nContigs; ++idx ) {
+            final int length = contigs.get(idx).getSequence().length;
+            lengths[idx] = length;
+            totalLength += length;
+        }
+
+        // sort lengths in ascending order (that's the only option)
+        Arrays.sort(lengths);
+
+        int lengthSumDoubled = 0;
+        // run the index from the end of the array toward the beginning (sum up the longest contigs first)
+        for ( int idx = nContigs - 1; idx >= 0; --idx ) {
+            lengthSumDoubled += 2 * lengths[idx];
+            if ( lengthSumDoubled >= totalLength ) return lengths[idx];
+        }
+
+        // should be impossible to reach this line
+        throw new ArithmeticException("impossible situation -- sum of array greater than twice the sum of each element");
+    }
 
     /** a sequence of bases, coverage data, and connections to other contigs */
     public static final class Contig {
